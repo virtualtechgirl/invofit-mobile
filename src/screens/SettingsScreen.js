@@ -6,31 +6,81 @@ import {
   ScrollView,
   Switch,
   StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Image,
+  Platform,
 } from 'react-native';
 import { C } from '../constants/theme';
 import { Icons } from '../components/Icons';
+import { useAuth } from '../lib/auth';
 
 export const SettingsScreen = ({ onClose, settings, onUpdateSettings }) => {
   const [restTimer, setRestTimer] = useState(settings?.restTimer || 90);
   const [units, setUnits] = useState(settings?.units || 'lbs');
   const [notifications, setNotifications] = useState(settings?.notifications ?? true);
-  const isSignedIn = false; // Will be wired up with Supabase later
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const {
+    isSignedIn,
+    loading: authCheckLoading,
+    signInWithApple,
+    signInWithGoogle,
+    signOut,
+    getUserInfo,
+  } = useAuth();
+
+  const userInfo = getUserInfo();
 
   const handleRestTimerChange = (value) => {
     setRestTimer(value);
     onUpdateSettings?.({ ...settings, restTimer: value });
   };
 
-  const handleUnitsToggle = () => {
-    const newUnits = units === 'lbs' ? 'kg' : 'lbs';
-    setUnits(newUnits);
-    onUpdateSettings?.({ ...settings, units: newUnits });
-  };
-
   const handleNotificationsToggle = () => {
     const newValue = !notifications;
     setNotifications(newValue);
     onUpdateSettings?.({ ...settings, notifications: newValue });
+  };
+
+  const handleAppleSignIn = async () => {
+    setAuthLoading(true);
+    const { error } = await signInWithApple();
+    setAuthLoading(false);
+    if (error) {
+      Alert.alert('Sign In Failed', error.message || 'Could not sign in with Apple');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthLoading(true);
+    const { error } = await signInWithGoogle();
+    setAuthLoading(false);
+    if (error) {
+      Alert.alert('Sign In Failed', error.message || 'Could not sign in with Google');
+    }
+  };
+
+  const handleSignOut = async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            setAuthLoading(true);
+            const { error } = await signOut();
+            setAuthLoading(false);
+            if (error) {
+              Alert.alert('Error', 'Could not sign out');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -49,13 +99,17 @@ export const SettingsScreen = ({ onClose, settings, onUpdateSettings }) => {
           <Text style={styles.sectionTitle}>PROFILE</Text>
           <View style={styles.profileCard}>
             <View style={styles.avatar}>
-              {Icons.profile(C.textMuted, 40)}
+              {userInfo?.avatar ? (
+                <Image source={{ uri: userInfo.avatar }} style={styles.avatarImage} />
+              ) : (
+                Icons.profile(C.textMuted, 40)
+              )}
             </View>
             <View style={styles.profileInfo}>
-              {isSignedIn ? (
+              {isSignedIn && userInfo ? (
                 <>
-                  <Text style={styles.profileName}>User Name</Text>
-                  <Text style={styles.profileEmail}>user@email.com</Text>
+                  <Text style={styles.profileName}>{userInfo.name}</Text>
+                  <Text style={styles.profileEmail}>{userInfo.email}</Text>
                 </>
               ) : (
                 <Text style={styles.profilePlaceholder}>Not signed in</Text>
@@ -65,21 +119,39 @@ export const SettingsScreen = ({ onClose, settings, onUpdateSettings }) => {
         </View>
 
         {/* Auth Buttons */}
-        <View style={styles.section}>
-          <Pressable style={styles.authBtn}>
-            <View style={styles.authBtnIcon}>
-              {Icons.apple(C.text, 20)}
-            </View>
-            <Text style={styles.authBtnText}>Sign in with Apple</Text>
-          </Pressable>
+        {!isSignedIn && (
+          <View style={styles.section}>
+            {authLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={C.accent} />
+                <Text style={styles.loadingText}>Signing in...</Text>
+              </View>
+            ) : (
+              <>
+                {Platform.OS === 'ios' && (
+                  <Pressable style={styles.authBtn} onPress={handleAppleSignIn}>
+                    <View style={styles.authBtnIcon}>
+                      {Icons.apple(C.text, 20)}
+                    </View>
+                    <Text style={styles.authBtnText}>Sign in with Apple</Text>
+                  </Pressable>
+                )}
 
-          <Pressable style={[styles.authBtn, styles.googleBtn]}>
-            <View style={styles.authBtnIcon}>
-              {Icons.google(20)}
-            </View>
-            <Text style={[styles.authBtnText, styles.googleBtnText]}>Sign in with Google</Text>
-          </Pressable>
-        </View>
+                <Pressable
+                  style={[styles.authBtn, styles.googleBtn]}
+                  onPress={handleGoogleSignIn}
+                >
+                  <View style={styles.authBtnIcon}>
+                    {Icons.google(20)}
+                  </View>
+                  <Text style={[styles.authBtnText, styles.googleBtnText]}>
+                    Sign in with Google
+                  </Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        )}
 
         <View style={styles.divider} />
 
@@ -100,15 +172,8 @@ export const SettingsScreen = ({ onClose, settings, onUpdateSettings }) => {
               <View
                 style={[
                   styles.sliderFill,
-                  { width: `${((restTimer - 60) / 60) * 100}%` }
+                  { width: `${((restTimer - 60) / 60) * 100}%` },
                 ]}
-              />
-              <Pressable
-                style={[
-                  styles.sliderThumb,
-                  { left: `${((restTimer - 60) / 60) * 100}%` }
-                ]}
-                onPress={() => {}}
               />
             </View>
             <Text style={styles.sliderLabel}>120s</Text>
@@ -140,10 +205,7 @@ export const SettingsScreen = ({ onClose, settings, onUpdateSettings }) => {
             <Text style={styles.settingLabel}>Units</Text>
             <View style={styles.toggleContainer}>
               <Pressable
-                style={[
-                  styles.toggleBtn,
-                  units === 'lbs' && styles.toggleBtnActive,
-                ]}
+                style={[styles.toggleBtn, units === 'lbs' && styles.toggleBtnActive]}
                 onPress={() => {
                   setUnits('lbs');
                   onUpdateSettings?.({ ...settings, units: 'lbs' });
@@ -159,10 +221,7 @@ export const SettingsScreen = ({ onClose, settings, onUpdateSettings }) => {
                 </Text>
               </Pressable>
               <Pressable
-                style={[
-                  styles.toggleBtn,
-                  units === 'kg' && styles.toggleBtnActive,
-                ]}
+                style={[styles.toggleBtn, units === 'kg' && styles.toggleBtnActive]}
                 onPress={() => {
                   setUnits('kg');
                   onUpdateSettings?.({ ...settings, units: 'kg' });
@@ -198,16 +257,21 @@ export const SettingsScreen = ({ onClose, settings, onUpdateSettings }) => {
         <View style={styles.section}>
           <Pressable
             style={[styles.signOutBtn, !isSignedIn && styles.signOutBtnDisabled]}
-            disabled={!isSignedIn}
+            disabled={!isSignedIn || authLoading}
+            onPress={handleSignOut}
           >
-            <Text
-              style={[
-                styles.signOutBtnText,
-                !isSignedIn && styles.signOutBtnTextDisabled,
-              ]}
-            >
-              Sign Out
-            </Text>
+            {authLoading && isSignedIn ? (
+              <ActivityIndicator size="small" color={C.error} />
+            ) : (
+              <Text
+                style={[
+                  styles.signOutBtnText,
+                  !isSignedIn && styles.signOutBtnTextDisabled,
+                ]}
+              >
+                Sign Out
+              </Text>
+            )}
           </Pressable>
         </View>
 
@@ -278,6 +342,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   profileInfo: {
     flex: 1,
@@ -295,6 +365,15 @@ const styles = StyleSheet.create({
   profilePlaceholder: {
     fontSize: 15,
     color: C.textMuted,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: C.textSec,
   },
   authBtn: {
     flexDirection: 'row',
@@ -376,15 +455,6 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: C.accent,
     borderRadius: 2,
-  },
-  sliderThumb: {
-    position: 'absolute',
-    top: -6,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: C.accent,
-    marginLeft: -8,
   },
   sliderButtons: {
     flexDirection: 'row',

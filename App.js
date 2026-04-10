@@ -12,8 +12,9 @@ import { C } from './src/constants/theme';
 import { VIO } from './src/constants/vio';
 import { PROTOCOLS, getProtocolSuggestion } from './src/constants/protocols';
 import { Storage } from './src/storage';
+import { AuthProvider } from './src/lib/auth';
 
-export default function App() {
+function AppContent() {
   const [activeTab, setActiveTab] = useState('home');
   const [selectedProtocol, setSelectedProtocol] = useState(PROTOCOLS[0]);
   const [workoutHistory, setWorkoutHistory] = useState([]);
@@ -205,3 +206,11 @@ const styles = StyleSheet.create({
     backgroundColor: C.bg,
   },
 });
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
