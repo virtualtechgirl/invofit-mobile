@@ -5,7 +5,9 @@ import { ProtocolsScreen } from './src/screens/ProtocolsScreen';
 import { EquipmentScreen } from './src/screens/EquipmentScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { TabBar } from './src/components/TabBar';
+import { Header } from './src/components/Header';
 import { C } from './src/constants/theme';
 import { VIO } from './src/constants/vio';
 import { PROTOCOLS, getProtocolSuggestion } from './src/constants/protocols';
@@ -19,6 +21,12 @@ export default function App() {
   const [equipment, setEquipment] = useState({});
   const [prs, setPrs] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState({
+    restTimer: 90,
+    units: 'lbs',
+    notifications: true,
+  });
 
   // Load data on mount
   useEffect(() => {
@@ -168,10 +176,24 @@ export default function App() {
 
   const isWorkout = activeTab === 'workout';
 
+  if (showSettings) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        <SettingsScreen
+          onClose={() => setShowSettings(false)}
+          settings={settings}
+          onUpdateSettings={setSettings}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={C.bg} />
       {renderScreen()}
+      {!isWorkout && <Header onProfilePress={() => setShowSettings(true)} />}
       {!isWorkout && <TabBar activeTab={activeTab} onTabPress={handleTabPress} />}
     </View>
   );
